@@ -1,0 +1,24 @@
+[project]
+name = "campuslink-ortools-worker"
+version = "0.1.0"
+description = "CampusLink conflict-free placement schedule optimizer"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic>=2.9,<3",
+  "uvicorn[standard]>=0.30,<1",
+  "ortools>=9.12,<10",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.3,<9",
+  "httpx>=0.27,<1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

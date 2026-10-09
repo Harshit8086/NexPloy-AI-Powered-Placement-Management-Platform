@@ -1,0 +1,95 @@
+﻿Loaded environment from .env
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< com.nexploy:campuslink-backend >-------------------
+[INFO] Building campuslink-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.4.4:run (default-cli) > test-compile @ campuslink-backend >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ campuslink-backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 63 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ campuslink-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 530 source files with javac [debug parameters release 21] to target\classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ campuslink-backend ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ campuslink-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 105 source files with javac [debug parameters release 21] to target\test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] /C:/Users/sanat/Downloads/NexPloy-Prototype-main/NexPloy-Prototype-main/Backend/src/test/java/com/nexploy/campuslink/aptitude/event/AptitudeAssessmentBridgeTest.java: Some input files use unchecked or unsafe operations.
+[INFO] /C:/Users/sanat/Downloads/NexPloy-Prototype-main/NexPloy-Prototype-main/Backend/src/test/java/com/nexploy/campuslink/aptitude/event/AptitudeAssessmentBridgeTest.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] <<< spring-boot:3.4.4:run (default-cli) < test-compile @ campuslink-backend <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.4.4:run (default-cli) @ campuslink-backend ---
+[INFO] Attaching agents: []
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.4)
+
+2026-10-04T00:17:29.741+05:30  INFO 3168 --- [campuslink-backend] [           main] c.n.campuslink.CampusLinkApplication     : Starting CampusLinkApplication using Java 21.0.11 with PID 3168 (C:\Users\sanat\Downloads\NexPloy-Prototype-main\NexPloy-Prototype-main\Backend\target\classes started by Rohit Pandit in C:\Users\sanat\Downloads\NexPloy-Prototype-main\NexPloy-Prototype-main\Backend)
+2026-10-04T00:17:29.743+05:30  INFO 3168 --- [campuslink-backend] [           main] c.n.campuslink.CampusLinkApplication     : No active profile set, falling back to 1 default profile: "default"
+2026-10-04T00:17:30.839+05:30  INFO 3168 --- [campuslink-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-04T00:17:31.118+05:30  INFO 3168 --- [campuslink-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 273 ms. Found 52 JPA repository interfaces.
+2026-10-04T00:17:31.686+05:30  INFO 3168 --- [campuslink-backend] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-10-04T00:17:31.697+05:30  INFO 3168 --- [campuslink-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-10-04T00:17:31.697+05:30  INFO 3168 --- [campuslink-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.39]
+2026-10-04T00:17:31.753+05:30  INFO 3168 --- [campuslink-backend] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-10-04T00:17:31.754+05:30  INFO 3168 --- [campuslink-backend] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1977 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-10-04T00:17:31.977+05:30  INFO 3168 --- [campuslink-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-04T00:17:32.134+05:30  INFO 3168 --- [campuslink-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@11295cb1
+2026-10-04T00:17:32.136+05:30  INFO 3168 --- [campuslink-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-04T00:17:32.159+05:30  INFO 3168 --- [campuslink-backend] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5432/campuslink (PostgreSQL 18.6)
+2026-10-04T00:17:32.168+05:30  WARN 3168 --- [campuslink-backend] [           main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: PostgreSQL 18.6 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 17.
+2026-10-04T00:17:32.234+05:30  INFO 3168 --- [campuslink-backend] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 63 migrations (execution time 00:00.054s)
+2026-10-04T00:17:32.284+05:30  INFO 3168 --- [campuslink-backend] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 63
+2026-10-04T00:17:32.287+05:30  INFO 3168 --- [campuslink-backend] [           main] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+2026-10-04T00:17:32.400+05:30  INFO 3168 --- [campuslink-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-04T00:17:32.442+05:30  INFO 3168 --- [campuslink-backend] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.11.Final
+2026-10-04T00:17:32.467+05:30  INFO 3168 --- [campuslink-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-04T00:17:32.680+05:30  INFO 3168 --- [campuslink-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-04T00:17:32.747+05:30  INFO 3168 --- [campuslink-backend] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 18.6
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-10-04T00:17:33.996+05:30  INFO 3168 --- [campuslink-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-04T00:17:34.034+05:30  INFO 3168 --- [campuslink-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-04T00:17:34.679+05:30  INFO 3168 --- [campuslink-backend] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-04T00:17:35.947+05:30  INFO 3168 --- [campuslink-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-04T00:17:35.947+05:30  WARN 3168 --- [campuslink-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used by Spring Security for automatically configuring username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider. If the current configuration is intentional, to turn off this warning, increase the logging level of 'org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer' to ERROR
+2026-10-04T00:17:37.623+05:30  INFO 3168 --- [campuslink-backend] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-10-04T00:17:37.634+05:30  INFO 3168 --- [campuslink-backend] [           main] c.n.campuslink.CampusLinkApplication     : Started CampusLinkApplication in 8.278 seconds (process running for 8.606)
+2026-10-04T00:17:37.636+05:30  WARN 3168 --- [campuslink-backend] [           main] c.n.c.a.config.InsecureDefaultsAdvisor   : SECURITY: demo account password is the checked-in default. Set the DEMO_PASSWORD environment variable before any shared/production deployment.

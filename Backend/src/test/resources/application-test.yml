@@ -1,0 +1,59 @@
+# Integration-test profile: runs against an in-memory H2 database in PostgreSQL
+# compatibility mode. Tests need no external database and run anywhere (CI, any
+# dev machine) with `mvn test`. Flyway is disabled and the schema is generated
+# from the JPA entities (ddl-auto: create-drop), so these tests exercise
+# application logic (routing, security, campus-scope, JSON contract) in isolation.
+#
+# Production and a real live-migration check use PostgreSQL via the default
+# profile (src/main/resources/application.yml) — H2 is for tests only.
+spring:
+  autoconfigure:
+    # Kafka is a runtime transport gated on nexploy.kafka.enabled (default OFF). Tests never use a
+    # broker, so exclude the autoconfiguration outright — no KafkaTemplate/admin bean is created and
+    # nothing attempts a connection. The in-process ApplicationEvent path is what tests exercise.
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      # The main profile's spring.mail.* leaks into tests and would make OTP delivery attempt a real
+      # SMTP handshake (auth failure -> 500 on /api/auth/otp/send). Tests never send mail, so no
+      # JavaMailSender bean at all — OtpService's ObjectProvider then skips delivery silently.
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:campuslink_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  ai:
+    provider: rule-based
+    openai:
+      api-key: ${GROQ_API_KEY:not-configured}
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      chat:
+        options:
+          model: ${GROQ_MODEL:openai/gpt-oss-120b}
+          temperature: ${GROQ_TEMPERATURE:0.1}
+# Tests run fully offline and deterministic: force the rule-based AI path regardless of the
+# runtime default (application.yml now defaults to "llm"). Tests that specifically exercise the
+# LLM seam override this locally with @TestPropertySource(properties = "nexploy.ai.provider=llm")
+# against a mocked ChatClient, so they still make no network call.
+  
+
+nexploy:
+  ai:
+    provider: rule-based
+  notifications:
+    email:
+      # The main profile defaults this to true, which would register NotificationEmailSender even
+      # though MailSenderAutoConfiguration is excluded above and tests never send mail. Keep the
+      # channel fully off: no sender bean, and the dispatcher's sweep is a documented no-op with an
+      # empty sender map. (The sender resolves JavaMailSender through an ObjectProvider, so even a
+      # registered sender without a mail bean would skip with a warning rather than fail startup.)
+      enabled: false

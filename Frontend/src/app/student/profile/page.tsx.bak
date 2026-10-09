@@ -1,0 +1,1009 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import {
+  UserSquare2,
+  GraduationCap,
+  Briefcase,
+  Building2,
+  ClipboardCheck,
+  Heart,
+  Mail,
+  Phone,
+  Award,
+  FolderGit2,
+  BadgeCheck,
+  Pencil,
+  Check,
+  X,
+  Plus,
+  Trash2,
+  Circle,
+  ListChecks,
+  ArrowUpRight,
+  Eye,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
+import { CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { DepthCard } from "@/components/intelligence/DepthCard";
+import { SkillBar } from "@/components/intelligence/SkillBar";
+import { DataReveal, DataRevealItem } from "@/components/intelligence/DataReveal";
+import { getPrimaryStudent, updatePrimaryStudent, listSkills, getMyBacklogHistory, type StudentUpdateInput, type StudentSkill, type BacklogHistoryEntry } from "@/lib/api/students";
+import { getCampus } from "@/lib/api/campuses";
+import { listDrives } from "@/lib/api/drives";
+import {
+  listCertificates,
+  fetchCertificateFile,
+  certificateTypeLabel,
+  certificateHasFile,
+  type StudentCertificate,
+} from "@/lib/api/certificates";
+import { useApiResource } from "@/hooks/useApiResource";
+import { useAppStore } from "@/hooks/useAppStore";
+import { evaluateEligibility } from "@/lib/eligibility";
+import { readinessBand } from "@/lib/status";
+import { profileCompleteness } from "@/lib/profile-completeness";
+import { proficiencyBand } from "@/lib/skill-band";
+import type { Drive, Student, StudentExperience, CampusSummary } from "@/types";
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/60 py-2 last:border-0">
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="text-right text-sm font-medium tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+/** Stacked labelled input for free-text / comma-separated list fields (career intent). */
+function ListField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 h-8 text-sm" />
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</p>}
+    </div>
+  );
+}
+
+/** Inline labelled input used inside the Academic Details card while editing. */
+function EditField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  step,
+  min,
+  max,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "number";
+  step?: string;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5 last:border-0">
+      <Label className="shrink-0 text-xs text-muted-foreground">{label}</Label>
+      <Input
+        type={type}
+        step={step}
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 max-w-[180px] text-right text-sm tabular-nums"
+      />
+    </div>
+  );
+}
+
+/** Repeatable add/remove chip editor for a string list (certifications, skills). Manages its
+ *  own input box; the committed list is owned by the parent via `values`/`onChange`. */
+function ChipEditor({
+  values,
+  onChange,
+  placeholder,
+  tone = "success",
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  tone?: "success" | "risk" | "muted" | "default";
+}) {
+  const [input, setInput] = useState("");
+  const add = () => {
+    const t = input.trim();
+    if (t && !values.includes(t)) onChange([...values, t]);
+    setInput("");
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {values.length > 0 ? (
+          values.map((v) => (
+            <Badge key={v} variant={tone} className="gap-1">
+              {v}
+              <button
+                type="button"
+                onClick={() => onChange(values.filter((x) => x !== v))}
+                className="ml-0.5 rounded-full opacity-70 hover:opacity-100"
+                aria-label={`Remove ${v}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))
+        ) : (
+          <span className="text-sm text-muted-foreground">None yet</span>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          placeholder={placeholder}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          className="h-8 text-sm"
+        />
+        <Button type="button" size="sm" variant="outline" onClick={add} className="shrink-0">
+          <Plus className="h-3.5 w-3.5" /> Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Repeatable add/remove editor for work-experience entries. The list is owned by the parent
+ *  via `values`/`onChange`; each row edits company / role / duration / summary in place. */
+function ExperienceEditor({
+  values,
+  onChange,
+}: {
+  values: StudentExperience[];
+  onChange: (next: StudentExperience[]) => void;
+}) {
+  const update = (i: number, patch: Partial<StudentExperience>) =>
+    onChange(values.map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
+  const remove = (i: number) => onChange(values.filter((_, idx) => idx !== i));
+  const add = () =>
+    onChange([...values, { company: "", role: "", duration: "", summary: "" }]);
+  return (
+    <div className="space-y-3">
+      {values.map((e, i) => (
+        <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-xs text-muted-foreground">Experience {i + 1}</Label>
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              className="text-muted-foreground hover:text-risk"
+              aria-label={`Remove experience ${i + 1}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <Input
+            value={e.company}
+            placeholder="Company"
+            onChange={(ev) => update(i, { company: ev.target.value })}
+            className="h-8 text-sm"
+          />
+          <Input
+            value={e.role}
+            placeholder="Role, e.g. Backend Engineering Intern"
+            onChange={(ev) => update(i, { role: ev.target.value })}
+            className="h-8 text-sm"
+          />
+          <Input
+            value={e.duration}
+            placeholder="Duration, e.g. May 2025 – Jul 2025"
+            onChange={(ev) => update(i, { duration: ev.target.value })}
+            className="h-8 text-sm"
+          />
+          <Input
+            value={e.summary}
+            placeholder="What you worked on"
+            onChange={(ev) => update(i, { summary: ev.target.value })}
+            className="h-8 text-sm"
+          />
+        </div>
+      ))}
+      <Button type="button" size="sm" variant="outline" onClick={add} className="gap-1.5">
+        <Plus className="h-3.5 w-3.5" /> Add experience
+      </Button>
+    </div>
+  );
+}
+
+type Draft = Record<string, string>;
+
+export default function PlacementProfilePage() {
+  // `version` bumps after a successful save so the profile refetches from the API.
+  const [version, setVersion] = useState(0);
+  const { data: s, loading, error, reload } = useApiResource<Student | null>(
+    () => getPrimaryStudent(),
+    [version],
+    null,
+  );
+  const { data: allDrives } = useApiResource<Drive[]>(() => listDrives(), [], []);
+  // Skills are managed solely in My Skills (the student_skills record). The profile surfaces
+  // them read-only, so this is the single source of truth for skills across both pages.
+  const { data: skills } = useApiResource<StudentSkill[]>(() => listSkills(), [], []);
+  // Backlog timeline behind the current count; refetches after a save (version bump) so a
+  // just-recorded change appears immediately.
+  const { data: backlogHistory } = useApiResource<BacklogHistoryEntry[]>(
+    () => getMyBacklogHistory(),
+    [version],
+    [],
+  );
+  // Campus name resolves from the authoritative campus endpoint once the student loads.
+  const { data: campus } = useApiResource<CampusSummary | null>(
+    () => (s?.campusId ? getCampus(s.campusId).then((c) => c ?? null) : Promise.resolve(null)),
+    [s?.campusId],
+    null,
+  );
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Draft>({});
+  // Certifications are edited as discrete chips rather than a comma-joined string.
+  const [certs, setCerts] = useState<string[]>([]);
+  const [experience, setExperience] = useState<StudentExperience[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const beginEdit = (student: Student) => {
+    setSaveError(null);
+    setDraft({
+      phone: student.phone ?? "",
+      department: student.department ?? "",
+      branch: student.branch ?? "",
+      branchCode: student.branchCode ?? "",
+      batch: student.batch ?? "",
+      // semester (1–12) and graduationYear (1900–2100) have no valid 0 value — a freshly
+      // registered profile stores 0, which must show as an empty field, not a literal "0"
+      // that would fail the backend's @Min bound on save.
+      semester: student.semester ? String(student.semester) : "",
+      graduationYear: student.graduationYear ? String(student.graduationYear) : "",
+      cgpa: String(student.cgpa ?? ""),
+      tenthPercentage: String(student.tenthPercentage ?? ""),
+      twelfthPercentage: String(student.twelfthPercentage ?? ""),
+      backlogs: String(student.backlogs ?? ""),
+      backlogHistory: String(student.backlogHistory ?? ""),
+      targetRole: student.targetRole ?? "",
+      preferredRoles: (student.preferredRoles ?? []).join(", "),
+      preferredDomains: (student.preferredDomains ?? []).join(", "),
+      preferredLocations: (student.preferredLocations ?? []).join(", "),
+    });
+    setCerts(student.certifications ?? []);
+    setExperience(student.experience ?? []);
+    setEditing(true);
+  };
+
+  const setField = (key: string, value: string) => setDraft((d) => ({ ...d, [key]: value }));
+
+  const num = (v: string): number | undefined => {
+    const t = v.trim();
+    if (t === "") return undefined;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const str = (v: string): string | undefined => {
+    const t = v.trim();
+    return t === "" ? undefined : t;
+  };
+  // For fields with no valid 0 value (semester, graduation year), only send a number when it
+  // falls inside the backend's accepted range; anything empty/out-of-range is omitted so the
+  // PUT patch "leaves it unchanged" instead of tripping the @Min/@Max bound with a 400.
+  const numInRange = (v: string, min: number, max: number): number | undefined => {
+    const n = num(v);
+    return n !== undefined && n >= min && n <= max ? n : undefined;
+  };
+  // Comma-separated free text → trimmed string[] (empties dropped). Always defined so
+  // clearing the field persists an empty list rather than leaving the old values.
+  const list = (v: string): string[] =>
+    v.split(",").map((t) => t.trim()).filter(Boolean);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    const payload: StudentUpdateInput = {
+      phone: str(draft.phone),
+      department: str(draft.department),
+      branch: str(draft.branch),
+      branchCode: str(draft.branchCode),
+      batch: str(draft.batch),
+      semester: numInRange(draft.semester, 1, 12),
+      graduationYear: numInRange(draft.graduationYear, 1900, 2100),
+      cgpa: num(draft.cgpa),
+      tenthPercentage: num(draft.tenthPercentage),
+      twelfthPercentage: num(draft.twelfthPercentage),
+      backlogs: num(draft.backlogs),
+      backlogHistory: num(draft.backlogHistory),
+      targetRole: str(draft.targetRole),
+      preferredRoles: list(draft.preferredRoles),
+      preferredDomains: list(draft.preferredDomains),
+      preferredLocations: list(draft.preferredLocations),
+      certifications: certs,
+      experience: experience
+        .map((e) => ({
+          company: e.company.trim(),
+          role: e.role.trim(),
+          duration: e.duration.trim(),
+          summary: e.summary.trim(),
+        }))
+        .filter((e) => e.company),
+    };
+    try {
+      await updatePrimaryStudent(payload);
+      setEditing(false);
+      setVersion((v) => v + 1);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save your profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!s) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <PageHeader
+          eyebrow="Profile"
+          title="Placement Profile"
+          subtitle="The single record every eligibility check, match score and readiness calculation reads from."
+        />
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          {loading ? "Loading profile…" : null}
+        </p>
+        {!loading && error && (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-risk" role="alert">
+              {error}
+            </p>
+            <Button size="sm" variant="outline" onClick={reload}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            Sign in as a student to view your placement profile.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const band = readinessBand(s.readiness);
+
+  const eligibleCount = allDrives.filter(
+    (d) => d.status === "ACTIVE" && evaluateEligibility(s, d).eligible,
+  ).length;
+
+  const completeness = profileCompleteness(s, skills.length);
+  const missing = completeness.items.filter((i) => !i.done);
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <PageHeader
+        eyebrow="Profile"
+        title="Placement Profile"
+        subtitle="The single record every eligibility check, match score and readiness calculation reads from."
+      />
+
+      <DepthCard className="mb-5 p-5" tilt>
+        {/* Header: stacked on phones/tablet so the name column keeps full width; only at lg+
+            (where the sidebar + wide main leave real room) does the badge/edit cluster sit inline
+            to the right. Below lg the badges would squeeze the min-w-0 name column into word-by-word
+            wrapping, so they drop to their own row instead. */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-4">
+            <Avatar className="h-16 w-16 shrink-0">
+              <AvatarFallback className="text-lg">{s.avatarInitials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold">{s.name}</h2>
+              <p className="text-sm text-muted-foreground">
+                {s.rollNumber} · {s.branch} · Batch {s.batch}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 shrink-0" />{" "}
+                  <span className="break-all">{s.email}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 shrink-0" /> {s.phone}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 lg:items-end">
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Badge variant={band.tone}>{band.label}</Badge>
+              <Badge variant="default">{s.placementStatus}</Badge>
+              <Badge variant="muted">{eligibleCount} eligible drives</Badge>
+            </div>
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="glow" onClick={handleSave} disabled={saving}>
+                  <Check className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(false);
+                    setSaveError(null);
+                  }}
+                  disabled={saving}
+                >
+                  <X className="h-3.5 w-3.5" /> Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => beginEdit(s)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit profile
+              </Button>
+            )}
+          </div>
+        </div>
+        {saveError && (
+          <p className="mt-3 text-xs text-risk" role="alert">
+            {saveError}
+          </p>
+        )}
+      </DepthCard>
+
+      {!editing && (
+        <DepthCard className="mb-5 p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <BadgeCheck className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Profile Completeness</CardTitle>
+            </div>
+            <span className="text-sm font-semibold tabular-nums text-violet-bright">
+              {completeness.score}%
+            </span>
+          </div>
+          <SkillBar
+            label={`${completeness.completed} of ${completeness.total} sections complete`}
+            value={completeness.score}
+          />
+          {missing.length > 0 ? (
+            <>
+              <ul className="mt-4 space-y-1.5">
+                {missing.map((i) => (
+                  <li key={i.key} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                    <span>
+                      <span className="font-medium text-foreground">{i.label}</span> — {i.hint}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Button size="sm" variant="outline" className="mt-4" onClick={() => beginEdit(s)}>
+                <Pencil className="h-3.5 w-3.5" /> Complete your profile
+              </Button>
+            </>
+          ) : (
+            <p className="mt-3 flex items-center gap-2 text-sm text-success">
+              <Check className="h-4 w-4 shrink-0" /> Your profile is complete — recruiters see the
+              full picture.
+            </p>
+          )}
+        </DepthCard>
+      )}
+
+      <DataReveal stagger className="grid gap-5 md:grid-cols-2">
+        <DataRevealItem>
+          <DepthCard className="h-full p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <GraduationCap className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Academic Details</CardTitle>
+            </div>
+            {editing ? (
+              <>
+                <Field label="Campus" value={campus?.name ?? "—"} />
+                <EditField label="Department" value={draft.department} onChange={(v) => setField("department", v)} />
+                <EditField label="Branch" value={draft.branch} onChange={(v) => setField("branch", v)} />
+                <EditField label="Branch Code" value={draft.branchCode} onChange={(v) => setField("branchCode", v)} />
+                <EditField label="Batch" value={draft.batch} onChange={(v) => setField("batch", v)} />
+                <EditField label="Semester" type="number" min={1} max={12} value={draft.semester} onChange={(v) => setField("semester", v)} />
+                <EditField label="Graduation Year" type="number" min={1900} max={2100} value={draft.graduationYear} onChange={(v) => setField("graduationYear", v)} />
+                <EditField label="CGPA" type="number" step="0.01" min={0} max={10} value={draft.cgpa} onChange={(v) => setField("cgpa", v)} />
+                <EditField label="10th Percentage" type="number" step="0.01" min={0} max={100} value={draft.tenthPercentage} onChange={(v) => setField("tenthPercentage", v)} />
+                <EditField label="12th Percentage" type="number" step="0.01" min={0} max={100} value={draft.twelfthPercentage} onChange={(v) => setField("twelfthPercentage", v)} />
+                <EditField label="Active Backlogs" type="number" min={0} value={draft.backlogs} onChange={(v) => setField("backlogs", v)} />
+                <EditField label="Backlog History" type="number" min={0} value={draft.backlogHistory} onChange={(v) => setField("backlogHistory", v)} />
+              </>
+            ) : (
+              <>
+                <Field label="Campus" value={campus?.name ?? "—"} />
+                <Field label="Department" value={s.department} />
+                <Field label="Branch" value={s.branchCode ? `${s.branch} (${s.branchCode})` : s.branch} />
+                <Field label="Batch" value={s.batch} />
+                <Field label="Semester" value={s.semester} />
+                <Field label="Graduation Year" value={s.graduationYear} />
+                <Field label="CGPA" value={s.cgpa.toFixed(2)} />
+                <Field label="10th Percentage" value={`${s.tenthPercentage}%`} />
+                <Field label="12th Percentage" value={`${s.twelfthPercentage}%`} />
+                <Field
+                  label="Active Backlogs"
+                  value={
+                    <span className={s.backlogs > 0 ? "text-risk" : "text-success"}>{s.backlogs}</span>
+                  }
+                />
+                <div className="mt-3 border-t border-border/60 pt-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Backlog History</p>
+                  {backlogHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No backlog changes recorded yet.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {backlogHistory.map((h) => (
+                        <li key={h.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
+                            <span
+                              className={
+                                h.activeBacklogs > 0 ? "font-medium text-risk" : "font-medium text-success"
+                              }
+                            >
+                              {h.activeBacklogs} active
+                            </span>
+                            {h.semester != null && <span className="text-xs">· Sem {h.semester}</span>}
+                            {h.clearedBacklogs != null && h.clearedBacklogs > 0 && (
+                              <Badge variant="success" className="text-[10px]">
+                                {h.clearedBacklogs} cleared
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {new Date(h.recordedAt).toLocaleDateString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
+          </DepthCard>
+        </DataRevealItem>
+
+        <DataRevealItem>
+          <DepthCard className="h-full p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Assessment Scores</CardTitle>
+            </div>
+            <div className="space-y-3">
+              <SkillBar label="Aptitude" value={s.assessments.aptitude} />
+              <SkillBar label="Coding" value={s.assessments.coding} />
+              <SkillBar label="Technical" value={s.assessments.technical} />
+              <SkillBar label="Communication" value={s.assessments.communication} />
+              <SkillBar label="Mock Interview" value={s.assessments.mockInterview} />
+            </div>
+
+            <div className="mt-5 flex items-center gap-2">
+              <Heart className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Placement Status</CardTitle>
+            </div>
+            <div className="mt-2">
+              <Field label="Placement Status" value={s.placementStatus} />
+              <Field label="Readiness" value={`${s.readiness} / 100`} />
+              <Field label="Placement Probability" value={`${s.placementProbability}%`} />
+              <Field label="Risk Level" value={s.riskLevel} />
+            </div>
+          </DepthCard>
+        </DataRevealItem>
+
+        <DataRevealItem>
+          <DepthCard className="flex h-[560px] flex-col p-5">
+            <div className="mb-3 flex shrink-0 items-center gap-2">
+              <Briefcase className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Skills &amp; Certifications</CardTitle>
+            </div>
+            <div className="no-scrollbar -mr-2 flex-1 overflow-y-auto pr-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Skills
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/student/skills">
+                  <ListChecks className="h-3.5 w-3.5" /> Manage in My Skills
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+            {/* Read-only view of the single skills record (student_skills), rendered with the same
+                proficiency bands as My Skills. Editing lives only in My Skills, so skills are no
+                longer duplicated across two edit surfaces. */}
+            {skills.length > 0 ? (
+              <div className="space-y-3">
+                {skills.map((sk) => {
+                  const b = proficiencyBand(sk.proficiency);
+                  return (
+                    <div key={sk.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate font-medium text-foreground">{sk.skill}</span>
+                          <span
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${b.chip} ${b.text}`}
+                          >
+                            <b.Icon className="h-3 w-3" /> {b.label}
+                          </span>
+                        </span>
+                        <span className={`shrink-0 font-semibold tabular-nums ${b.text}`}>
+                          {sk.proficiency}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${b.bar}`}
+                          style={{ width: `${sk.proficiency}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No skills yet — add them in{" "}
+                <Link
+                  href="/student/skills"
+                  className="font-medium text-violet-bright hover:underline"
+                >
+                  My Skills
+                </Link>
+                .
+              </p>
+            )}
+            <p className="mb-2 mt-4 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <BadgeCheck className="h-3.5 w-3.5" /> Certifications
+            </p>
+            {editing ? (
+              <ChipEditor
+                values={certs}
+                onChange={setCerts}
+                placeholder="e.g. AWS Certified Cloud Practitioner"
+                tone="muted"
+              />
+            ) : (
+              <ul className="space-y-1.5">
+                {s.certifications.length > 0 ? (
+                  s.certifications.map((c) => (
+                    <li key={c} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Award className="h-3.5 w-3.5 shrink-0 text-violet-bright" /> {c}
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-muted-foreground">None yet</li>
+                )}
+              </ul>
+            )}
+            <p className="mt-4 text-xs text-muted-foreground">
+              Resume score:{" "}
+              <span className="font-semibold text-foreground">{s.resumeScore}/100</span> — see Resume
+              Intelligence for the full breakdown.
+            </p>
+            </div>
+          </DepthCard>
+        </DataRevealItem>
+
+        <DataRevealItem>
+          <DepthCard className="flex h-[560px] flex-col p-5">
+            <div className="mb-3 flex shrink-0 items-center gap-2">
+              <Building2 className="h-4 w-4 text-violet-bright" />
+              <CardTitle>Work Experience</CardTitle>
+            </div>
+            <div className="no-scrollbar -mr-2 flex-1 overflow-y-auto pr-2">
+            {editing ? (
+              <ExperienceEditor values={experience} onChange={setExperience} />
+            ) : s.experience.length > 0 ? (
+              <div className="space-y-3">
+                {s.experience.map((e) => (
+                  <div key={`${e.company}-${e.role}`} className="rounded-lg border border-border p-3">
+                    <p className="text-sm font-medium">{e.role || "—"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {e.company}
+                      {e.duration ? ` · ${e.duration}` : ""}
+                    </p>
+                    {e.summary && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{e.summary}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No experience added yet.</p>
+            )}
+            </div>
+          </DepthCard>
+        </DataRevealItem>
+
+      </DataReveal>
+
+      <ProfileCertificatesSection />
+
+      <DepthCard className="mt-5 p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-violet/10 p-2 text-violet-bright">
+              <FolderGit2 className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle>Projects</CardTitle>
+              <p className="text-xs text-muted-foreground">Portfolio &amp; Engineering Work</p>
+            </div>
+          </div>
+          {s.projects.length > 0 && (
+            <Badge variant="muted" className="uppercase tracking-wider">
+              {s.projects.length} total
+            </Badge>
+          )}
+        </div>
+        {s.projects.length > 0 ? (
+          <div className="space-y-4">
+            {s.projects.map((p) => (
+              <div key={p.name} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold">{p.name}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{p.summary}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {p.stack.map((t) => (
+                    <Badge key={t} variant="muted" className="gap-1.5">
+                      <span className="h-1 w-1 rounded-full bg-violet-bright" /> {t}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No projects added yet.</p>
+        )}
+      </DepthCard>
+
+      <DepthCard className="mt-5 p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-violet/10 p-2 text-violet-bright">
+              <UserSquare2 className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle>Career Intent</CardTitle>
+              <p className="text-xs text-muted-foreground">Role, Industry &amp; Location Targeting</p>
+            </div>
+          </div>
+          <Badge variant="muted" className="uppercase tracking-wider">
+            Preferences
+          </Badge>
+        </div>
+        {editing ? (
+          <div className="space-y-3">
+            <ListField
+              label="Target Role"
+              hint="The one role you're aiming for — drives skill-gap and matching."
+              value={draft.targetRole}
+              onChange={(v) => setField("targetRole", v)}
+            />
+            <ListField
+              label="Preferred Roles"
+              hint="Comma-separated, e.g. Backend Engineer, Data Analyst"
+              value={draft.preferredRoles}
+              onChange={(v) => setField("preferredRoles", v)}
+            />
+            <ListField
+              label="Preferred Domains"
+              hint="Comma-separated, e.g. Fintech, Healthcare"
+              value={draft.preferredDomains}
+              onChange={(v) => setField("preferredDomains", v)}
+            />
+            <ListField
+              label="Preferred Locations"
+              hint="Comma-separated, e.g. Bengaluru, Remote"
+              value={draft.preferredLocations}
+              onChange={(v) => setField("preferredLocations", v)}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-violet/30 bg-violet/5 p-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-bright">
+                  Target Primary Role
+                </p>
+                <p className="mt-0.5 truncate text-lg font-semibold">{s.targetRole || "—"}</p>
+              </div>
+              {s.targetRole && (
+                <Badge variant="default" className="shrink-0">
+                  Primary Match
+                </Badge>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Preferred Roles
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {s.preferredRoles.length > 0 ? (
+                  s.preferredRoles.map((r) => (
+                    <Badge key={r} variant="outline">
+                      {r}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Preferred Domains
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {s.preferredDomains.length > 0 ? (
+                  s.preferredDomains.map((r) => (
+                    <Badge key={r} variant="outline">
+                      {r}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Preferred Locations
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {s.preferredLocations.length > 0 ? (
+                  s.preferredLocations.map((r) => (
+                    <Badge key={r} variant="muted" className="gap-1.5">
+                      <span className="h-1 w-1 rounded-full bg-violet-bright" /> {r}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </DepthCard>
+    </div>
+  );
+}
+
+/**
+ * Read-only showcase of the student's structured certificates (managed on the Certificates page).
+ * Self-contained: it fetches its own data and streams a certificate's document for viewing. Kept
+ * separate from the free-text certification name chips in the "Skills & Certifications" card above.
+ */
+function ProfileCertificatesSection() {
+  const pushToast = useAppStore((s) => s.pushToast);
+  const { data: certificates, loading } = useApiResource<StudentCertificate[]>(
+    () => listCertificates(),
+    [],
+    [],
+  );
+  const [viewingId, setViewingId] = useState<string | null>(null);
+
+  const view = async (cert: StudentCertificate) => {
+    setViewingId(cert.id);
+    try {
+      const blob = await fetchCertificateFile(cert.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      pushToast(
+        "Could not open document",
+        err instanceof Error ? err.message : "The file could not be loaded.",
+      );
+    } finally {
+      setViewingId(null);
+    }
+  };
+
+  return (
+    <DepthCard className="mt-5 p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Award className="h-4 w-4 text-violet-bright" />
+          <CardTitle>Certificates</CardTitle>
+          {certificates.length > 0 && <Badge variant="muted">{certificates.length}</Badge>}
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/student/certificates">
+            <BadgeCheck className="h-3.5 w-3.5" /> Manage
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading certificates…</p>
+      ) : certificates.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No certificates yet — add them in{" "}
+          <Link href="/student/certificates" className="font-medium text-violet-bright hover:underline">
+            Certificates
+          </Link>
+          .
+        </p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {certificates.map((cert) => (
+            <div key={cert.id} className="rounded-lg border border-border p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{cert.title}</p>
+                  <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                    <Building2 className="h-3.5 w-3.5 shrink-0" /> {cert.issuingOrganization}
+                  </p>
+                </div>
+                <Badge variant="muted" className="shrink-0">
+                  {certificateTypeLabel(cert.type)}
+                </Badge>
+              </div>
+              {cert.credentialId && (
+                <p className="mt-2 truncate text-xs text-muted-foreground">
+                  <span className="text-foreground/70">Credential ID:</span> {cert.credentialId}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {certificateHasFile(cert) && (
+                  <Button variant="outline" size="sm" onClick={() => view(cert)} disabled={viewingId === cert.id}>
+                    {viewingId === cert.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" />
+                    )}
+                    View Certificate
+                  </Button>
+                )}
+                {cert.verificationUrl && (
+                  <Button asChild variant="ghost" size="sm">
+                    <a href={cert.verificationUrl} target="_blank" rel="noopener noreferrer">
+                      Verify <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </DepthCard>
+  );
+}
